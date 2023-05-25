@@ -380,7 +380,6 @@ class Service extends \think\Service
     {
         Cache::delete("addons");
         Cache::delete("hooks");
-
         $file = self::getExtraAddonsFile();
 
         $config = get_addons_autoload_config(true);
@@ -418,6 +417,7 @@ class Service extends \think\Service
 
         // 备份冲突文件
         if (config('cms.backup_global_files')) {
+            // 仅备份修改过的文件
             $conflictFiles = self::getGlobalFiles($name, true);
             if ($conflictFiles) {
                 $zip = new ZipFile();
@@ -445,6 +445,7 @@ class Service extends \think\Service
             Service::config($name, ['files' => $files]);
         }
 
+
         // 复制文件
         if (is_dir($sourceAssetsDir)) {
             copydirs($sourceAssetsDir, $destAssetsDir);
@@ -465,7 +466,6 @@ class Service extends \think\Service
                 @rmdirs($addonDir . $dir);
             }
         }
-
         // 执行启用脚本
         try {
             $class = get_addons_class($name);
@@ -488,6 +488,202 @@ class Service extends \think\Service
         // 刷新
         Service::refresh();
         return true;
+    }
+
+    /**
+     * 禁用
+     *
+     * @param string $name 插件名称
+     * @param boolean $force 是否强制禁用
+     * @return  boolean
+     * @throws  Exception
+     */
+    public static function disable($name, $force = false)
+    {
+        if (!$name || !is_dir(addon_path() . $name)) {
+            throw new Exception('Addon not exists');
+        }
+        $file = self::getExtraAddonsFile();
+        if (!is_really_writable($file)) {
+            throw new Exception(__("Unable to open file '%s' for writing", "addons.php"));
+        }
+        if (!$force) {
+            Service::noconflict($name);
+        }
+
+        // 备份冲突文件
+        if (config('cms.backup_global_files')) {
+            // 仅备份修改过的文件
+            $conflictFiles = self::getGlobalFiles($name, true);
+            if ($conflictFiles) {
+                $zip = new ZipFile();
+                try {
+                    foreach ($conflictFiles as $k => $v) {
+                        $zip->addFile(root_path() . $v, $v);
+                    }
+                    $addonsBackupDir = self::getAddonsBackupDir();
+                    $zip->saveAsFile($addonsBackupDir . $name . "-conflict-enable-" . date("YmdHis") . ".zip");
+                } catch (Exception $e) {
+
+                } finally {
+                    $zip->close();
+                }
+            }
+        }
+
+        $config = Service::config($name);
+
+        $addonDir = self::getAddonDir($name);
+        //插件资源目录
+        $destAssetsDir = self::getDestAssetsDir($name);
+
+        // 移除插件全局文件
+        $list = Service::getGlobalFiles($name);
+
+        // 插件纯净模式时将原有的文件复制回插件目录
+        // 当无法获取全局文件列表时也将列表复制回插件目录
+        if (config('cms.addon_pure_mode') || !$list) {
+            if ($config && isset($config['files']) && is_array($config['files'])) {
+                foreach ($config['files'] as $index => $item) {
+                    // 避免切换不同服务器后导致路径不一致
+                    $item = str_replace(['/', '\\'], ds(), $item);
+                    // 插件资源目录，无需重复复制
+                    if (stripos($item, str_replace(root_path(), '', $destAssetsDir)) === 0) {
+                        continue;
+                    }
+                    // 检查目录是否存在，不存在则创建
+                    $itemBaseDir = dirname($addonDir . $item);
+                    if (!is_dir($itemBaseDir)) {
+                        @mkdir($itemBaseDir, 0755, true);
+                    }
+                    if (is_file(root_path() . $item)) {
+                        @copy(root_path() . $item, $addonDir . $item);
+                    }
+                    $list = $config['files'];
+                }
+            }
+            //复制插件目录资源
+            if (is_dir($destAssetsDir)) {
+                @copydirs($destAssetsDir, $addonDir . 'assets' . ds());
+            }
+        }
+
+        $dirs = [];
+        foreach ($list as $k => $v) {
+            $file = root_path() . $v;
+            $dirs[] = dirname($file);
+            @unlink($file);
+        }
+
+        // 移除插件空目录
+        $dirs = array_filter(array_unique($dirs));
+        foreach ($dirs as $k => $v) {
+            remove_empty_folder($v);
+        }
+
+        $info = get_addons_info($name);
+        $info['status'] = 0;
+        unset($info['url']);
+
+        set_addons_info($name, $info);
+
+        // 执行禁用脚本
+        try {
+            $class = get_addons_class($name);
+            if (class_exists($class)) {
+                $addon = new $class(App::instance());
+
+                if (method_exists($class, "disable")) {
+                    $addon->disable();
+                }
+            }
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
+
+        // 刷新
+        Service::refresh();
+        return true;
+    }
+
+    /**
+     * 升级插件
+     *
+     * @param string $name 插件名称
+     * @param array $extend 扩展参数
+     */
+    public static function upgrade($name, $extend = [])
+    {
+        $info = get_addons_info($name);
+        if ($info['status'] == 1) {
+            throw new Exception('Please disable addon first');
+        }
+        $config = get_addons_config($name);
+        if ($config) {
+            //备份配置
+        }
+
+        // 远程下载插件
+        $tmpFile = Service::download($name, $extend);
+
+        // 备份插件文件
+        Service::backup($name);
+
+        $addonDir = self::getAddonDir($name);
+
+        // 删除插件目录下的全局文件
+        $files = self::getCheckDirs();
+        foreach ($files as $index => $file) {
+            @rmdirs($addonDir . $file);
+        }
+        try {
+            // 解压插件
+            Service::unzip($name);
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        } finally {
+            // 移除临时文件
+            @unlink($tmpFile);
+        }
+
+        if ($config) {
+            // 还原配置
+            set_addons_config($name, $config);
+        }
+
+        // 导入
+        Service::importsql($name);
+
+        // 执行升级脚本
+        try {
+            $addonName = ucfirst($name);
+            //创建临时类用于调用升级的方法
+            $sourceFile = $addonDir . $addonName . ".php";
+            $destFile = $addonDir . $addonName . "Upgrade.php";
+            $classContent = str_replace("class {$addonName} extends", "class {$addonName}Upgrade extends", file_get_contents($sourceFile));
+
+            //创建临时的类文件
+            @file_put_contents($destFile, $classContent);
+
+            $className = "\\addons\\" . $name . "\\" . $addonName . "Upgrade";
+            $addon = new $className(App::instance());
+
+            //调用升级的方法
+            if (method_exists($addon, "upgrade")) {
+                $addon->upgrade();
+            }
+            //移除临时文件
+            @unlink($destFile);
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
+        // 刷新
+        Service::refresh();
+        //必须变更版本号
+        $info['version'] = isset($extend['plugin_version']) ? $extend['plugin_version'] : $info['version'];
+
+        $info['config'] = get_addons_config($name) ? 1 : 0;
+        return $info;
     }
 
     /**
@@ -528,6 +724,31 @@ class Service extends \think\Service
             return $tmpFile;
         }
         throw new Exception("No permission to write temporary files");
+    }
+
+    /**
+     * 备份插件
+     * @param string $name 插件名称
+     * @return bool
+     * @throws Exception
+     */
+    public static function backup($name)
+    {
+        $addonsBackupDir = self::getAddonsBackupDir();
+        $file = $addonsBackupDir . $name . '-backup-' . date("YmdHis") . '.zip';
+        $zipFile = new ZipFile();
+        try {
+            $zipFile
+                ->addDirRecursive(self::getAddonDir($name))
+                ->saveAsFile($file)
+                ->close();
+        } catch (ZipException $e) {
+
+        } finally {
+            $zipFile->close();
+        }
+
+        return true;
     }
 
     /**
@@ -618,6 +839,7 @@ class Service extends \think\Service
             throw new Exception('Addon not exists');
         }
         $addonClass = get_addons_class($name);
+        dump($addonClass);
         if (!$addonClass) {
             throw new Exception("The addon file does not exist");
         }

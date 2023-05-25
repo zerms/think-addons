@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use think\facade\Event;
 use think\facade\Route;
+use think\facade\Config;
 use think\helper\{
     Str, Arr
 };
@@ -124,7 +125,8 @@ if (!function_exists('get_addons_class')) {
                 $namespace = '\\addons\\' . $name . '\\controller\\' . $class;
                 break;
             default:
-                $namespace = '\\addons\\' . $name . '\\Plugin';
+//                $namespace = '\\addons\\' . $name . '\\Plugin';
+                $namespace = '\\addons\\' . $name . '\\' . ucwords($name);
         }
 
         return class_exists($namespace) ? $namespace : '';
@@ -218,6 +220,28 @@ if (!function_exists('addons_url')) {
         return Route::buildUrl("@addons/{$addons}/{$controller}/{$action}", $param)->suffix($suffix)->domain($domain);
     }
 }
+
+if (!function_exists('remove_empty_folder')) {
+    /**
+     * 移除空目录
+     * @param string $dir 目录
+     */
+    function remove_empty_folder($dir)
+    {
+        try {
+            $isDirEmpty = !(new \FilesystemIterator($dir))->valid();
+            if ($isDirEmpty) {
+                @rmdir($dir);
+                remove_empty_folder(dirname($dir));
+            }
+        } catch (\UnexpectedValueException $e) {
+
+        } catch (\Exception $e) {
+
+        }
+    }
+}
+
 if (!function_exists('get_addons_list')) {
     /**
      * 获得插件列表
@@ -250,11 +274,11 @@ if (!function_exists('get_addons_list')) {
                 continue;
             }
 
-            $info = Config::parse($info_file, '', "addon-info-{$name}");
+            $info = parse_ini_file($info_file, true, INI_SCANNER_TYPED) ?: [];
             if (!isset($info['name'])) {
                 continue;
             }
-            $info['url'] = addon_url($name);
+            $info['url'] = addons_url($name);
             $list[$name] = $info;
         }
         return $list;
@@ -310,47 +334,30 @@ if (!function_exists('get_addons_autoload_config')) {
     function get_addons_autoload_config($truncate = false)
     {
         // 读取addons的配置
-        $config = (array)\think\facade\Config::get('addons');
+        $config = (array) Config::get('addons');
         if ($truncate) {
             // 清空手动配置的钩子
             $config['hooks'] = [];
         }
-
-        // 伪静态优先级
-        $priority = isset($config['priority']) && $config['priority'] ? is_array($config['priority']) ? $config['priority'] : explode(',', $config['priority']) : [];
-
-        $route = [];
-        // 读取插件目录及钩子列表
-        $base = get_class_methods("\\think\\Addons");
-
-        $base = array_merge($base, ['install', 'uninstall', 'enable', 'disable']);
-
-        $url_domain_deploy = \think\facade\Config::get('url_domain_deploy');
-        $addons = get_addons_list();
+        $route  = [];
         $domain = [];
 
-        $priority = array_merge($priority, array_keys($addons));
+        // 读取插件目录及钩子列表
+        $base = get_class_methods('\\think\\Addons');
+        $base = array_merge($base, ['install', 'uninstall', 'enable', 'disable']);
 
-        $orderedAddons = array();
-        foreach ($priority as $key) {
-            if (!isset($addons[$key])) {
+        $addons = get_addons_list();
+        foreach ($addons as $name => $addon) {
+            if (0 >= $addon['status']) {
                 continue;
             }
-            $orderedAddons[$key] = $addons[$key];
-        }
-
-        foreach ($orderedAddons as $name => $addon) {
-            if (!$addon['state']) {
-                continue;
-            }
-
             // 读取出所有公共方法
-            $methods = (array)get_class_methods("\\addons\\" . $name . "\\" . ucfirst($name));
+            $methods = (array) get_class_methods('\\addons\\' . $name . '\\' . ucfirst($name));
             // 跟插件基类方法做比对，得到差异结果
             $hooks = array_diff($methods, $base);
             // 循环将钩子方法写入配置中
             foreach ($hooks as $hook) {
-                $hook = Loader::parseName($hook, 0, false);
+                $hook = parse_name($hook, 0, false);
                 if (!isset($config['hooks'][$hook])) {
                     $config['hooks'][$hook] = [];
                 }
@@ -359,20 +366,20 @@ if (!function_exists('get_addons_autoload_config')) {
                     $config['hooks'][$hook] = explode(',', $config['hooks'][$hook]);
                 }
                 if (!in_array($name, $config['hooks'][$hook])) {
-                    $config['hooks'][$hook][] = $name;
+                    $config['hooks'][$hook][] = get_addons_class($name);
                 }
             }
             $conf = get_addons_config($addon['name']);
             if ($conf) {
                 $conf['rewrite'] = isset($conf['rewrite']) && is_array($conf['rewrite']) ? $conf['rewrite'] : [];
-                $rule = array_map(function ($value) use ($addon) {
+                $rule            = array_map(function ($value) use ($addon) {
                     return "{$addon['name']}/{$value}";
                 }, array_flip($conf['rewrite']));
-                if ($url_domain_deploy && isset($conf['domain']) && $conf['domain']) {
+                if (isset($conf['domain']) && $conf['domain']) {
                     $domain[] = [
                         'addon'  => $addon['name'],
                         'domain' => $conf['domain'],
-                        'rule'   => $rule
+                        'rule'   => $rule,
                     ];
                 } else {
                     $route = array_merge($route, $rule);
@@ -382,6 +389,22 @@ if (!function_exists('get_addons_autoload_config')) {
         $config['route'] = $route;
         $config['route'] = array_merge($config['route'], $domain);
         return $config;
+    }
+}
+
+if (!function_exists('get_addons_fullconfig')) {
+    /**
+     * 获取插件类的配置数组
+     * @param string $name 插件名
+     * @return array
+     */
+    function get_addons_fullconfig($name)
+    {
+        $addon = get_addons_instance($name);
+        if (!$addon) {
+            return [];
+        }
+        return $addon->getFullConfig($name);
     }
 }
 
@@ -397,7 +420,7 @@ if (!function_exists('set_addons_config')) {
     function set_addons_config($name, $config, $writefile = true)
     {
         $addon = get_addons_instance($name);
-        $addon->setAddonConfig($name, $config);
+        $addon->setConfig($name, $config);
         $fullconfig = get_addons_fullconfig($name);
         foreach ($fullconfig as $k => &$v) {
             if (isset($config[$v['name']])) {
@@ -424,7 +447,7 @@ if (!function_exists('set_addons_fullconfig')) {
     function set_addons_fullconfig($name, $array)
     {
         $file = addon_path() . $name . ds() . 'config.php';
-        if (!\util\File::is_really_writable($file)) {
+        if (!\xb\File::is_really_writable($file)) {
             throw new Exception('文件没有写入权限');
         }
         if ($handle = fopen($file, 'w')) {
