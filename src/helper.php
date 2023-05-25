@@ -59,20 +59,6 @@ if (!function_exists('hook')) {
     }
 }
 
-if (!function_exists('ds')) {
-    function ds()
-    {
-        return DIRECTORY_SEPARATOR;
-    }
-}
-
-if (!function_exists('addon_path')) {
-    function addon_path()
-    {
-        return root_path("addons");
-    }
-}
-
 if (!function_exists('get_addons_info')) {
     /**
      * 读取插件的基础信息
@@ -148,7 +134,7 @@ if (!function_exists('get_addons_class')) {
 if (!function_exists('get_addons_config')) {
     /**
      * 获取插件类的配置值值
-     * @param  string  $name  插件名
+     * @param string $name 插件名
      * @return array
      */
     function get_addons_config($name)
@@ -157,7 +143,35 @@ if (!function_exists('get_addons_config')) {
         if (!$addon) {
             return [];
         }
-        return $addon->getAddonConfig($name);
+        return $addon->getConfig($name);
+    }
+}
+
+if (!function_exists('get_addons_tables')) {
+    /**
+     * 获取插件创建的表
+     * @param string $name 插件名
+     * @return array
+     */
+    function get_addons_tables($name)
+    {
+        $addonInfo = get_addons_info($name);
+        if (!$addonInfo) {
+            return [];
+        }
+        $regex = "/^CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?`?([a-zA-Z_]+)`?/mi";
+        $sqlFile = addon_path() . $name . ds() . 'install.sql';
+        $tables = [];
+        if (is_file($sqlFile)) {
+            preg_match_all($regex, file_get_contents($sqlFile), $matches);
+            if ($matches && isset($matches[2]) && $matches[2]) {
+                $prefix = get_database("prefix");
+                $tables = array_map(function ($item) use ($prefix) {
+                    return str_replace("__PREFIX__", $prefix, $item);
+                }, $matches[2]);
+            }
+        }
+        return $tables;
     }
 }
 
@@ -204,6 +218,48 @@ if (!function_exists('addons_url')) {
         return Route::buildUrl("@addons/{$addons}/{$controller}/{$action}", $param)->suffix($suffix)->domain($domain);
     }
 }
+if (!function_exists('get_addons_list')) {
+    /**
+     * 获得插件列表
+     * @return array
+     */
+    function get_addons_list()
+    {
+        $results = scandir(addon_path());
+        $list = [];
+        foreach ($results as $name) {
+            if ($name === '.' or $name === '..') {
+                continue;
+            }
+            if (is_file(addon_path() . $name)) {
+                continue;
+            }
+            $addonDir = addon_path() . $name . ds();
+            if (!is_dir($addonDir)) {
+                continue;
+            }
+
+            if (!is_file($addonDir . ucfirst($name) . '.php')) {
+                continue;
+            }
+
+            //这里不采用get_addon_info是因为会有缓存
+            //$info = get_addon_info($name);
+            $info_file = $addonDir . 'info.ini';
+            if (!is_file($info_file)) {
+                continue;
+            }
+
+            $info = Config::parse($info_file, '', "addon-info-{$name}");
+            if (!isset($info['name'])) {
+                continue;
+            }
+            $info['url'] = addon_url($name);
+            $list[$name] = $info;
+        }
+        return $list;
+    }
+}
 
 if (!function_exists('set_addons_info')) {
     /**
@@ -242,6 +298,90 @@ if (!function_exists('set_addons_info')) {
             throw new Exception('文件没有写入权限');
         }
         return true;
+    }
+}
+
+if (!function_exists('get_addons_autoload_config')) {
+    /**
+     * 获得插件自动加载的配置
+     * @param bool $truncate 是否清除手动配置的钩子
+     * @return array
+     */
+    function get_addons_autoload_config($truncate = false)
+    {
+        // 读取addons的配置
+        $config = (array)\think\facade\Config::get('addons');
+        if ($truncate) {
+            // 清空手动配置的钩子
+            $config['hooks'] = [];
+        }
+
+        // 伪静态优先级
+        $priority = isset($config['priority']) && $config['priority'] ? is_array($config['priority']) ? $config['priority'] : explode(',', $config['priority']) : [];
+
+        $route = [];
+        // 读取插件目录及钩子列表
+        $base = get_class_methods("\\think\\Addons");
+
+        $base = array_merge($base, ['install', 'uninstall', 'enable', 'disable']);
+
+        $url_domain_deploy = \think\facade\Config::get('url_domain_deploy');
+        $addons = get_addons_list();
+        $domain = [];
+
+        $priority = array_merge($priority, array_keys($addons));
+
+        $orderedAddons = array();
+        foreach ($priority as $key) {
+            if (!isset($addons[$key])) {
+                continue;
+            }
+            $orderedAddons[$key] = $addons[$key];
+        }
+
+        foreach ($orderedAddons as $name => $addon) {
+            if (!$addon['state']) {
+                continue;
+            }
+
+            // 读取出所有公共方法
+            $methods = (array)get_class_methods("\\addons\\" . $name . "\\" . ucfirst($name));
+            // 跟插件基类方法做比对，得到差异结果
+            $hooks = array_diff($methods, $base);
+            // 循环将钩子方法写入配置中
+            foreach ($hooks as $hook) {
+                $hook = Loader::parseName($hook, 0, false);
+                if (!isset($config['hooks'][$hook])) {
+                    $config['hooks'][$hook] = [];
+                }
+                // 兼容手动配置项
+                if (is_string($config['hooks'][$hook])) {
+                    $config['hooks'][$hook] = explode(',', $config['hooks'][$hook]);
+                }
+                if (!in_array($name, $config['hooks'][$hook])) {
+                    $config['hooks'][$hook][] = $name;
+                }
+            }
+            $conf = get_addons_config($addon['name']);
+            if ($conf) {
+                $conf['rewrite'] = isset($conf['rewrite']) && is_array($conf['rewrite']) ? $conf['rewrite'] : [];
+                $rule = array_map(function ($value) use ($addon) {
+                    return "{$addon['name']}/{$value}";
+                }, array_flip($conf['rewrite']));
+                if ($url_domain_deploy && isset($conf['domain']) && $conf['domain']) {
+                    $domain[] = [
+                        'addon'  => $addon['name'],
+                        'domain' => $conf['domain'],
+                        'rule'   => $rule
+                    ];
+                } else {
+                    $route = array_merge($route, $rule);
+                }
+            }
+        }
+        $config['route'] = $route;
+        $config['route'] = array_merge($config['route'], $domain);
+        return $config;
     }
 }
 

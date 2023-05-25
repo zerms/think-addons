@@ -1,11 +1,28 @@
 <?php
-
+/**
+ * +----------------------------------------------------------------------
+ * | think-addons [thinkphp6]
+ * +----------------------------------------------------------------------
+ *  .--,       .--,             | FILE: Addons.php
+ * ( (  \.---./  ) )            | AUTHOR: byron
+ *  '.__/o   o\__.'             | EMAIL: xiaobo.sun@qq.com
+ *     {=  ^  =}                | QQ: 150093589
+ *     /       \                | DATETIME: 2019/11/5 14:47
+ *    //       \\               |
+ *   //|   .   |\\              |
+ *   "'\       /'"_.-~^`'-.     |
+ *      \  _  /--'         `    |
+ *    ___)( )(___               |-----------------------------------------
+ *   (((__) (__)))              | 高山仰止,景行行止.虽不能至,心向往之。
+ * +----------------------------------------------------------------------
+ * | Copyright (c) 2019 http://www.zzstudio.net All rights reserved.
+ * +----------------------------------------------------------------------
+ */
 declare(strict_types=1);
 
 namespace think;
 
 use think\App;
-use think\facade\Config as ThinkConfig;
 use think\helper\Str;
 use think\facade\Config;
 use think\facade\View;
@@ -26,12 +43,6 @@ abstract class Addons
     protected $addon_config;
     // 插件信息
     protected $addon_info;
-    // 当前插件标识
-    protected $addonName = '';
-    // 插件配置作用域
-    protected $configRange = 'addonconfig';
-    // 插件信息作用域
-    protected $infoRange = 'addoninfo';
 
     /**
      * 插件构造函数
@@ -71,54 +82,6 @@ abstract class Addons
         $this->request->addon = $name;
 
         return $name;
-    }
-
-    /**
-     * 设置插件信息数据.
-     * @param $name
-     * @param array $value
-     * @return array
-     */
-    final public function setInfo($name = '', $value = [])
-    {
-        if (empty($name)) {
-            $name = $this->getName();
-        }
-        $info = $this->getInfo($name);
-        $info = array_merge($info, $value);
-        ThinkConfig::set($info, $this->infoRange . $name);
-        return $info;
-    }
-
-    /**
-     * @title 获取插件的配置数组
-     * @param string $name 可选模块名
-     * @return array|mixed|null
-     */
-    final public function getAddonConfig($name = '', $force = false)
-    {
-        if (empty($name)) {
-            $name = $this->getName();
-        }
-        if (!$force) {
-            $config = ThinkConfig::get($this->configRange . $name);
-            if ($config) {
-                return $config;
-            }
-        }
-        $config = [];
-        $configFile = $this->addon_path . 'config.php';
-        if (is_file($configFile)) {
-            $configArr = include $configFile;
-            if (is_array($configArr)) {
-                foreach ($configArr as $key => $value) {
-                    $config[$value['name']] = $value['value'] ?? '';
-                }
-                unset($configArr);
-            }
-        }
-        ThinkConfig::set($config, $this->configRange . $name);
-        return $config;
     }
 
     /**
@@ -222,6 +185,39 @@ abstract class Addons
         Config::set($config, $this->addon_config);
 
         return $config;
+    }
+
+    /**
+     * 设置插件信息数据
+     * @param       $name
+     * @param array $value
+     * @return array
+     */
+    final public function setInfo($name = '', $value = [])
+    {
+        if (empty($name)) {
+            $name = $this->getName();
+        }
+        $info = $this->getInfo($name);
+        $info = array_merge($info, $value);
+        Config::set($info, $name);
+        return $info;
+    }
+
+    /**
+     * 检查基础配置信息是否完整
+     * @return bool
+     */
+    final public function checkInfo()
+    {
+        $info = $this->getInfo();
+        $info_check_keys = ['name', 'title', 'intro', 'author', 'version', 'status'];
+        foreach ($info_check_keys as $value) {
+            if (!array_key_exists($value, $info)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     //必须实现安装
