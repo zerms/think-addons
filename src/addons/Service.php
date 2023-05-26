@@ -510,7 +510,6 @@ class Service extends \think\Service
         if (!$force) {
             Service::noconflict($name);
         }
-
         // 备份冲突文件
         if (config('cms.backup_global_files')) {
             // 仅备份修改过的文件
@@ -531,15 +530,14 @@ class Service extends \think\Service
             }
         }
 
+        // 读取插件配置
         $config = Service::config($name);
-
+        // 指定插件目录
         $addonDir = self::getAddonDir($name);
         //插件资源目录
         $destAssetsDir = self::getDestAssetsDir($name);
-
         // 移除插件全局文件
         $list = Service::getGlobalFiles($name);
-
         // 插件纯净模式时将原有的文件复制回插件目录
         // 当无法获取全局文件列表时也将列表复制回插件目录
         if (config('cms.addon_pure_mode') || !$list) {
@@ -567,7 +565,6 @@ class Service extends \think\Service
                 @copydirs($destAssetsDir, $addonDir . 'assets' . ds());
             }
         }
-
         $dirs = [];
         foreach ($list as $k => $v) {
             $file = root_path() . $v;
@@ -580,13 +577,11 @@ class Service extends \think\Service
         foreach ($dirs as $k => $v) {
             remove_empty_folder($v);
         }
-
         $info = get_addons_info($name);
         $info['status'] = 0;
         unset($info['url']);
 
         set_addons_info($name, $info);
-
         // 执行禁用脚本
         try {
             $class = get_addons_class($name);
@@ -650,7 +645,7 @@ class Service extends \think\Service
             // 还原配置
             set_addons_config($name, $config);
         }
-
+        
         // 导入
         Service::importsql($name);
 
@@ -839,7 +834,6 @@ class Service extends \think\Service
             throw new Exception('Addon not exists');
         }
         $addonClass = get_addons_class($name);
-        dump($addonClass);
         if (!$addonClass) {
             throw new Exception("The addon file does not exist");
         }

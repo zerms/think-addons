@@ -149,6 +149,42 @@ if (!function_exists('get_addons_config')) {
     }
 }
 
+if (!function_exists('get_addons_config_value')) {
+    /**
+     * 获取插件类的配置指定值
+     * @param string $name 插件名
+     * @return array
+     */
+    function get_addons_config_value($name, $config, $tree = 1)
+    {
+        $value = null;
+        foreach ($config as $k => &$v) {
+            if (!empty($v)) {
+                if ($tree > 1) {
+                    foreach ($v as $v2) {
+                        if ($v2['name'] == $name) {
+                            $value = $v2['value'];
+                            break;
+                        }
+                    }
+                } else {
+                    if ($v['name'] == $name) {
+                        $value = $v['value'];
+                        break;
+                    }
+                }
+                if (isset($v['children']) and !empty($v['children'])) {
+                    $value = get_addons_config_value($name, $v['children'], $tree + 1);
+                }
+            }
+            if (!empty($value)) {
+                return $value;
+            }
+        }
+        return $value;
+    }
+}
+
 if (!function_exists('get_addons_tables')) {
     /**
      * 获取插件创建的表
@@ -267,8 +303,8 @@ if (!function_exists('get_addons_list')) {
                 continue;
             }
 
-            //这里不采用get_addon_info是因为会有缓存
-            //$info = get_addon_info($name);
+            //这里不采用get_addons_info是因为会有缓存
+            //$info = get_addons_info($name);
             $info_file = $addonDir . 'info.ini';
             if (!is_file($info_file)) {
                 continue;
@@ -334,12 +370,12 @@ if (!function_exists('get_addons_autoload_config')) {
     function get_addons_autoload_config($truncate = false)
     {
         // 读取addons的配置
-        $config = (array) Config::get('addons');
+        $config = (array)Config::get('addons');
         if ($truncate) {
             // 清空手动配置的钩子
             $config['hooks'] = [];
         }
-        $route  = [];
+        $route = [];
         $domain = [];
 
         // 读取插件目录及钩子列表
@@ -352,7 +388,7 @@ if (!function_exists('get_addons_autoload_config')) {
                 continue;
             }
             // 读取出所有公共方法
-            $methods = (array) get_class_methods('\\addons\\' . $name . '\\' . ucfirst($name));
+            $methods = (array)get_class_methods('\\addons\\' . $name . '\\' . ucfirst($name));
             // 跟插件基类方法做比对，得到差异结果
             $hooks = array_diff($methods, $base);
             // 循环将钩子方法写入配置中
@@ -372,14 +408,14 @@ if (!function_exists('get_addons_autoload_config')) {
             $conf = get_addons_config($addon['name']);
             if ($conf) {
                 $conf['rewrite'] = isset($conf['rewrite']) && is_array($conf['rewrite']) ? $conf['rewrite'] : [];
-                $rule            = array_map(function ($value) use ($addon) {
+                $rule = array_map(function ($value) use ($addon) {
                     return "{$addon['name']}/{$value}";
                 }, array_flip($conf['rewrite']));
                 if (isset($conf['domain']) && $conf['domain']) {
                     $domain[] = [
-                        'addon'  => $addon['name'],
+                        'addon' => $addon['name'],
                         'domain' => $conf['domain'],
-                        'rule'   => $rule,
+                        'rule' => $rule,
                     ];
                 } else {
                     $route = array_merge($route, $rule);
@@ -421,20 +457,45 @@ if (!function_exists('set_addons_config')) {
     {
         $addon = get_addons_instance($name);
         $addon->setConfig($name, $config);
-        $fullconfig = get_addons_fullconfig($name);
-        foreach ($fullconfig as $k => &$v) {
-            if (isset($config[$v['name']])) {
-                $value = $v['type'] !== 'array' && is_array($config[$v['name']]) ? implode(',', $config[$v['name']]) : $config[$v['name']];
-                $v['value'] = $value;
-            }
-        }
+        $fullconfig = $config;
         if ($writefile) {
             // 写入配置文件
             set_addons_fullconfig($name, $fullconfig);
         }
         return true;
     }
+
+
 }
+
+if (!function_exists('config_tree')) {
+    function config_tree($config, $data, $tree = 1)
+    {
+        foreach ($config as $k => &$v) {
+            if (!empty($v)) {
+                if ($tree > 1) {
+                    foreach ($v as $k2 => $v2) {
+                        if (isset($data[$v2['name']])) {
+                            $value = $data[$v2['name']];
+                            $v2['value'] = $value;
+                        }
+                        $v[$k2] = $v2;
+                    }
+                } else {
+                    if (isset($data[$v['name']])) {
+                        $value = $data[$v['name']];
+                        $v['value'] = $value;
+                    }
+                }
+                if (isset($v['children']) and !empty($v['children'])) {
+                    $v['children'] = config_tree($v['children'], $data, $tree + 1);
+                }
+            }
+        }
+        return $config;
+    }
+}
+
 
 if (!function_exists('set_addons_fullconfig')) {
     /**

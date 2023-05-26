@@ -176,8 +176,7 @@ abstract class Addons
         Config::set($config, $name);
         return $config;
     }
-
-
+    
     /**
      * 获取配置信息
      * @param bool $type 是否获取完整配置
