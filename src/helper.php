@@ -124,6 +124,9 @@ if (!function_exists('get_addons_class')) {
             case 'controller':
                 $namespace = '\\addons\\' . $name . '\\controller\\' . $class;
                 break;
+            case 'api':
+                $namespace = '\\app\\api\\' . '\\controller\\' . $name . "\\" . $class;
+                break;
             default:
 //                $namespace = '\\addons\\' . $name . '\\Plugin';
                 $namespace = '\\addons\\' . $name . '\\' . ucwords($name);
@@ -160,18 +163,9 @@ if (!function_exists('get_addons_config_value')) {
         $value = null;
         foreach ($config as $k => &$v) {
             if (!empty($v)) {
-                if ($tree > 1) {
-                    foreach ($v as $v2) {
-                        if ($v2['name'] == $name) {
-                            $value = $v2['value'];
-                            break;
-                        }
-                    }
-                } else {
-                    if ($v['name'] == $name) {
-                        $value = $v['value'];
-                        break;
-                    }
+                if ($v['name'] == $name) {
+                    $value = $v['value'];
+                    break;
                 }
                 if (isset($v['children']) and !empty($v['children'])) {
                     $value = get_addons_config_value($name, $v['children'], $tree + 1);
