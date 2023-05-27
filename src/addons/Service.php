@@ -297,7 +297,7 @@ class Service extends \think\Service
                 $addon = new $class(App::instance());
                 $addon->install();
                 if (isset($info['has_menulist']) && $info['has_menulist']) {
-                    $menu_list = property_exists($addon, 'admin_list') ? $addon->menu_list : [];
+                    $menu_list = property_exists($addon, 'menu_list') ? $addon->menu_list : [];
                     //添加菜单
                     Menu::addAddonMenu($menu_list, $info);
                 }

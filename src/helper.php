@@ -464,8 +464,6 @@ if (!function_exists('set_addons_config')) {
         }
         return true;
     }
-
-
 }
 
 if (!function_exists('config_tree')) {
