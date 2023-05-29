@@ -125,13 +125,12 @@ if (!function_exists('get_addons_class')) {
                 $namespace = '\\addons\\' . $name . '\\controller\\' . $class;
                 break;
             case 'api':
-                $namespace = '\\app\\api\\' . '\\controller\\' . $name . "\\" . $class;
+                $namespace = '\\app\\api' . '\\controller\\' . $class;
                 break;
             default:
 //                $namespace = '\\addons\\' . $name . '\\Plugin';
                 $namespace = '\\addons\\' . $name . '\\' . ucwords($name);
         }
-
         return class_exists($namespace) ? $namespace : '';
     }
 }

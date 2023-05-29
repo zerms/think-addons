@@ -312,6 +312,8 @@ class Service extends \think\Service
         self::importsql($name);
         // 启用插件
         self::enable($name, true);
+        // 启用中间件
+        self::middleware($name,true);
 
         $info['config'] = get_addons_config($name) ? 1 : 0;
         $info['testdata'] = is_file(self::getTestdataFile($name));
@@ -367,6 +369,8 @@ class Service extends \think\Service
         File::del_dir(addon_path() . $name);
         // 刷新
         self::refresh();
+        // 禁用中间件
+        self::middleware($name,false);
         return true;
     }
 
@@ -487,6 +491,8 @@ class Service extends \think\Service
 
         // 刷新
         Service::refresh();
+        // 启用中间件
+        self::middleware($name,true);
         return true;
     }
 
@@ -598,6 +604,8 @@ class Service extends \think\Service
 
         // 刷新
         Service::refresh();
+        // 禁用中间件
+        self::middleware($name,false);
         return true;
     }
 
@@ -645,7 +653,7 @@ class Service extends \think\Service
             // 还原配置
             set_addons_config($name, $config);
         }
-        
+
         // 导入
         Service::importsql($name);
 
@@ -674,6 +682,8 @@ class Service extends \think\Service
         }
         // 刷新
         Service::refresh();
+        // 启用中间件
+        self::middleware($name,true);
         //必须变更版本号
         $info['version'] = isset($extend['plugin_version']) ? $extend['plugin_version'] : $info['version'];
 
@@ -817,6 +827,41 @@ class Service extends \think\Service
                     $templine = '';
                 }
             }
+        }
+        return true;
+    }
+
+    /**
+     * 写入中间件
+     *
+     * @param string $name 插件名称
+     * @param boolean $force 是否禁用
+     * @return  boolean
+     */
+    public static function middleware(string $name, bool $force = false)
+    {
+        $file = root_path("app") . 'middleware.php';
+        if (!File::is_really_writable($file)) {
+            throw new Exception('文件没有写入权限');
+        }
+        $array = require $file;
+        $ins_middleware = "app\api\middleware\\" . ucwords($name) . "";
+        if ($force == true) {
+            $array[] = $ins_middleware;
+        }
+        foreach ($array as $key => $item) {
+            if ($item == $ins_middleware) {
+                if ($force == false) {
+                    unset($array[$key]);
+                }
+            }
+        }
+
+        if ($handle = fopen($file, 'w')) {
+            fwrite($handle, "<?php\n\n" . 'return ' . var_export($array, true) . ";\n");
+            fclose($handle);
+        } else {
+            throw new Exception('文件没有写入权限');
         }
         return true;
     }
