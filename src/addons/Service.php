@@ -655,7 +655,7 @@ class Service extends \think\Service
         }
 
         // 导入
-        Service::importsql($name);
+        Service::importsql($name, "update.sql");
 
         // 执行升级脚本
         try {
