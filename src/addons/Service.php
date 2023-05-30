@@ -313,7 +313,7 @@ class Service extends \think\Service
         // 启用插件
         self::enable($name, true);
         // 启用中间件
-        self::middleware($name,true);
+        self::middleware($name, true);
 
         $info['config'] = get_addons_config($name) ? 1 : 0;
         $info['testdata'] = is_file(self::getTestdataFile($name));
@@ -370,7 +370,7 @@ class Service extends \think\Service
         // 刷新
         self::refresh();
         // 禁用中间件
-        self::middleware($name,false);
+        self::middleware($name, false);
         return true;
     }
 
@@ -492,7 +492,7 @@ class Service extends \think\Service
         // 刷新
         Service::refresh();
         // 启用中间件
-        self::middleware($name,true);
+        self::middleware($name, true);
         return true;
     }
 
@@ -605,7 +605,7 @@ class Service extends \think\Service
         // 刷新
         Service::refresh();
         // 禁用中间件
-        self::middleware($name,false);
+        self::middleware($name, false);
         return true;
     }
 
@@ -683,7 +683,7 @@ class Service extends \think\Service
         // 刷新
         Service::refresh();
         // 启用中间件
-        self::middleware($name,true);
+        self::middleware($name, true);
         //必须变更版本号
         $info['version'] = isset($extend['plugin_version']) ? $extend['plugin_version'] : $info['version'];
 
@@ -846,15 +846,16 @@ class Service extends \think\Service
         }
         $array = require $file;
         $ins_middleware = "app\api\middleware\\" . ucwords($name) . "";
-        if ($force == true) {
-            $array[] = $ins_middleware;
+        if (!file_exists(root_path("app\api\middleware") . ucwords($name) . ".php") and $force == true) {
+            return false;
         }
         foreach ($array as $key => $item) {
             if ($item == $ins_middleware) {
-                if ($force == false) {
-                    unset($array[$key]);
-                }
+                unset($array[$key]);
             }
+        }
+        if ($force == true) {
+            $array[] = $ins_middleware;
         }
 
         if ($handle = fopen($file, 'w')) {
