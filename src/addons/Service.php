@@ -663,6 +663,7 @@ class Service extends \think\Service
             //创建临时类用于调用升级的方法
             $sourceFile = $addonDir . $addonName . ".php";
             $destFile = $addonDir . $addonName . "Upgrade.php";
+
             $classContent = str_replace("class {$addonName} extends", "class {$addonName}Upgrade extends", file_get_contents($sourceFile));
 
             //创建临时的类文件
@@ -682,6 +683,8 @@ class Service extends \think\Service
         }
         // 刷新
         Service::refresh();
+        // 启用插件
+        self::enable($name, true);
         // 启用中间件
         self::middleware($name, true);
         //必须变更版本号
