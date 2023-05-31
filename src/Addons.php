@@ -139,17 +139,17 @@ abstract class Addons
      * 插件基础信息
      * @return array
      */
-    final public function getInfo()
+    final public function getInfo($name)
     {
-        $info = Config::get($this->addon_info, []);
+        $info = Config::get($this->addon_info . $name, []);
         if ($info) {
             return $info;
         }
-
         // 文件属性
         $info = $this->info ?? [];
         // 文件配置
         $info_file = $this->addon_path . 'info.ini';
+        $info_file1 = file_get_contents($info_file);
         if (is_file($info_file)) {
             $_info = parse_ini_file($info_file, true, INI_SCANNER_TYPED) ?: [];
             $_info['url'] = addons_url();
@@ -176,7 +176,7 @@ abstract class Addons
         Config::set($config, $name);
         return $config;
     }
-    
+
     /**
      * 获取配置信息
      * @param bool $type 是否获取完整配置
