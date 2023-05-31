@@ -390,7 +390,6 @@ class Service extends \think\Service
         if ($config['autoload']) {
             return;
         }
-
         if (!File::is_really_writable($file)) {
             throw new Exception(__("Unable to open file '%s' for writing", "addons.php"));
         }
@@ -449,7 +448,6 @@ class Service extends \think\Service
             Service::config($name, ['files' => $files]);
         }
 
-
         // 复制文件
         if (is_dir($sourceAssetsDir)) {
             copydirs($sourceAssetsDir, $destAssetsDir);
@@ -484,7 +482,9 @@ class Service extends \think\Service
         }
 
         $info = get_addons_info($name);
+
         $info['status'] = 1;
+
         unset($info['url']);
 
         set_addons_info($name, $info);
@@ -585,8 +585,8 @@ class Service extends \think\Service
         }
         $info = get_addons_info($name);
         $info['status'] = 0;
-        unset($info['url']);
 
+        unset($info['url']);
         set_addons_info($name, $info);
         // 执行禁用脚本
         try {

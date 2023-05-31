@@ -139,8 +139,11 @@ abstract class Addons
      * 插件基础信息
      * @return array
      */
-    final public function getInfo($name)
+    final public function getInfo($name = "")
     {
+        if(empty($name)){
+            $name = $this->getName();
+        }
         $info = Config::get($this->addon_info . $name, []);
         if ($info) {
             return $info;
