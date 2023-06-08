@@ -166,8 +166,8 @@ if (!function_exists('get_addons_config_value')) {
                     $value = $v['value'];
                     break;
                 }
-                if (isset($v['children']) and !empty($v['children'])) {
-                    $value = get_addons_config_value($name, $v['children'], $tree + 1);
+                if (isset($v['config']['children']) and !empty($v['config']['children'])) {
+                    $value = get_addons_config_value($name, $v['config']['children'], $tree + 1);
                 }
             }
             if (!empty($value)) {

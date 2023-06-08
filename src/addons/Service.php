@@ -256,7 +256,7 @@ class Service extends \think\Service
     public static function install($name, $force = false, $extend = [])
     {
         if (!$name || (is_dir(addon_path() . $name) && !$force)) {
-            throw new Exception('Addon already exists');
+            throw new Exception(__("Addon already exists"));
         }
         $extend['domain'] = request()->host(true);
         // 远程下载插件
@@ -331,12 +331,12 @@ class Service extends \think\Service
     public static function uninstall($name, $force = false)
     {
         if (!$name || !is_dir(addon_path() . $name)) {
-            throw new Exception('Addon not exists');
+            throw new Exception(__("Addon not exists"));
         }
         $info = get_addons_info($name);
 
         if ($info['status'] == 1) {
-            throw new Exception('Please disable the add before trying to uninstall');
+            throw new Exception(__("Please disable the add before trying to uninstall"));
         }
         if (!$force) {
             Service::noconflict($name);
@@ -398,7 +398,7 @@ class Service extends \think\Service
             fwrite($handle, "<?php\n\n" . 'return ' . var_export($config, true) . ';');
             fclose($handle);
         } else {
-            throw new Exception('文件没有写入权限');
+            throw new Exception(__("Unable to open file '%s' for writing", ""));
         }
         return true;
     }
@@ -412,7 +412,7 @@ class Service extends \think\Service
     public static function enable($name, $force = false)
     {
         if (!$name || !is_dir(addon_path() . $name)) {
-            throw new Exception('Addon not exists');
+            throw new Exception(__("Addon not exists"));
         }
         if (!$force) {
             Service::noconflict($name);
@@ -619,7 +619,7 @@ class Service extends \think\Service
     {
         $info = get_addons_info($name);
         if ($info['status'] == 1) {
-            throw new Exception('Please disable addon first');
+            throw new Exception(__("Please disable addon first"));
         }
         $config = get_addons_config($name);
         if ($config) {
@@ -724,14 +724,14 @@ class Service extends \think\Service
                 throw new AddonException($install_data['message'] ?? ($install_data['msg'] ?? __("Error")), $install_data['code'] ?? 400);
             }
         } catch (TransferException $e) {
-            throw new Exception("Addon package download failed");
+            throw new Exception(__("Addon package download failed"));
         }
         if ($write = fopen($tmpFile, 'w')) {
             fwrite($write, $content);
             fclose($write);
             return $tmpFile;
         }
-        throw new Exception("No permission to write temporary files");
+        throw new Exception(__("No permission to write temporary files"));
     }
 
     /**
@@ -769,7 +769,7 @@ class Service extends \think\Service
     public static function unzip($name)
     {
         if (!$name) {
-            throw new Exception('Invalid parameters');
+            throw new Exception(__("Invalid parameters"));
         }
         $addonsBackupDir = self::getAddonsBackupDir();
         $file = $addonsBackupDir . $name . '.zip';
@@ -780,7 +780,7 @@ class Service extends \think\Service
             $zip->openFile($file);
         } catch (ZipException $e) {
             $zip->close();
-            throw new Exception('Unable to open the zip file');
+            throw new Exception(__("Unable to open the zip file"));
         }
 
         $dir = self::getAddonDir($name);
@@ -792,7 +792,7 @@ class Service extends \think\Service
         try {
             $zip->extractTo($dir);
         } catch (ZipException $e) {
-            throw new Exception('Unable to extract the file');
+            throw new Exception(__("Unable to extract the file"));
         } finally {
             $zip->close();
         }
@@ -880,15 +880,15 @@ class Service extends \think\Service
     public static function check($name)
     {
         if (!$name || !is_dir(addon_path() . $name)) {
-            throw new Exception('Addon not exists');
+            throw new Exception(__("Addon not exists"));
         }
         $addonClass = get_addons_class($name);
         if (!$addonClass) {
-            throw new Exception("The addon file does not exist");
+            throw new Exception(__("The addon file does not exist"));
         }
         $addon = new $addonClass(App::instance());
         if (!$addon->checkInfo()) {
-            throw new Exception("The configuration file content is incorrect");
+            throw new Exception(__("The configuration file content is incorrect"));
         }
         return true;
     }
@@ -1099,7 +1099,7 @@ class Service extends \think\Service
     public static function encryption_request($url = "", $data = [], $method = "post", $extend = [], $status = 1)
     {
         if (empty($url) or empty($data) or empty($method)) {
-            throw new Exception("Invalid parameters");
+            throw new Exception(__("Invalid parameters"));
         }
         $data = json_encode($data);
         // 数据通过公钥加密
