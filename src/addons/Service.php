@@ -618,9 +618,6 @@ class Service extends \think\Service
     public static function upgrade($name, $extend = [])
     {
         $info = get_addons_info($name);
-        if ($info['status'] == 1) {
-            throw new Exception(__("Please disable addon first"));
-        }
         $config = get_addons_config($name);
         if ($config) {
             //备份配置
@@ -797,6 +794,45 @@ class Service extends \think\Service
             $zip->close();
         }
         return $dir;
+    }
+
+    /**
+     * 更新配置文件
+     *
+     * @param string $name 插件名称
+     * @param string $url 获取详情链接
+     * @param array $data 数据
+     * @return  string
+     * @throws  Exception
+     */
+    public static function set_ini(string $name, string $url, array $data)
+    {
+        $file = addon_path() . $name . ds() . 'info.ini';
+        $info = get_addons_info($name);
+        $addon_detail = self::encryption_request($url, ['sign' => $data['plugin_sign'], 'licence' => $data['licence'], 'domain' => $data['domain'], 'mac' => $data['mac']], "get", ["public_key" => $data['public_key'], "sign" => $data['sign']]);
+        if ($addon_detail['code'] == 200) {
+            if (isset($info['url'])) unset($info['url']);
+
+            $addon_detail_data = $addon_detail['data'] ?? [];
+            $info['title'] = $addon_detail_data['name'] ?? "";
+            $info['intro'] = $addon_detail_data['description'] ?? "";
+            $info['img'] = $addon_detail_data['img'] ?? "";
+            $info['readme'] = $addon_detail_data['readme'] ?? "";
+            $info['version'] = $addon_detail_data['version'] ?? "v1.0.0";
+            $info['author'] = $addon_detail_data['developer'] ?? "118CMS";
+            $info['createTime'] = date("Y-m-d H:i:s");
+            $info_ini = "";
+            foreach ($info as $k => $v) {
+                $info_ini .= $k . " = " . $v . "\n";
+            }
+            if ($handle = fopen($file, 'w')) {
+                fwrite($handle, $info_ini);
+                fclose($handle);
+            } else {
+                throw new Exception('文件没有写入权限');
+            }
+        }
+        return true;
     }
 
     /**
