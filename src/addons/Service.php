@@ -836,6 +836,47 @@ class Service extends \think\Service
     }
 
     /**
+     * 验证前置插件
+     *
+     * @param string $name 插件名称
+     * @return  string
+     * @throws  Exception
+     */
+    public static function check_pre(string $name)
+    {
+        $sign = "";
+        $class = get_addons_class($name);
+        if (class_exists($class)) {
+            $addon = new $class(App::instance());
+            $addons_pre = $addon->addon_pre ?? [];
+            foreach ($addons_pre as $addon) {
+                $info = get_addons_info($addon['sign']);
+                if (!$info || $info['status'] != 1) {
+                    $sign .= $addon['title'] . ",";
+                }
+            }
+        }
+        $sign = rtrim($sign, ",");
+        if (!empty($sign)) {
+            throw new Exception(__("Please install and enable %s in the backend plugin management before attempting again", $sign));
+        }
+        return true;
+    }
+
+    /**
+     * 验证同类型插件
+     *
+     * @param string $name 插件名称
+     * @return  string
+     * @throws  Exception
+     */
+    public static function check_type(string $name)
+    {
+        return true;
+    }
+
+
+    /**
      * 导入SQL
      *
      * @param string $name 插件名称
