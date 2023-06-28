@@ -812,12 +812,13 @@ class Service extends \think\Service
         $addon_detail = self::encryption_request($url, ['sign' => $data['plugin_sign'], 'licence' => $data['licence'], 'domain' => $data['domain'], 'mac' => $data['mac']], "get", ["public_key" => $data['public_key'], "sign" => $data['sign']]);
         if ($addon_detail['code'] == 200) {
             if (isset($info['url'])) unset($info['url']);
-
             $addon_detail_data = $addon_detail['data'] ?? [];
+            $readme = $addon_detail_data['readme'] ?? "";
+            $readme = str_replace(["\n", "\r"], "", $readme);
             $info['title'] = $addon_detail_data['name'] ?? "";
             $info['intro'] = $addon_detail_data['description'] ?? "";
             $info['img'] = $addon_detail_data['img'] ?? "";
-            $info['readme'] = $addon_detail_data['readme'] ?? "";
+            $info['readme'] = $readme;
             $info['version'] = $addon_detail_data['version'] ?? "v1.0.0";
             $info['author'] = $addon_detail_data['developer'] ?? "118CMS";
             $info['createTime'] = date("Y-m-d H:i:s");
@@ -927,7 +928,10 @@ class Service extends \think\Service
         $array = require $file;
         $ins_middleware = "app\api\middleware\\" . ucwords($name) . "";
         if (!file_exists(root_path("app\api\middleware") . ucwords($name) . ".php") and $force == true) {
-            return false;
+            $ins_middleware = "app\index\middleware\\" . ucwords($name) . "";
+            if (!file_exists(root_path("app\index\middleware") . ucwords($name) . ".php") and $force == true) {
+                return false;
+            }
         }
         foreach ($array as $key => $item) {
             if ($item == $ins_middleware) {
