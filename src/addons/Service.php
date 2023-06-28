@@ -535,7 +535,6 @@ class Service extends \think\Service
                 }
             }
         }
-
         // 读取插件配置
         $config = Service::config($name);
         // 指定插件目录
@@ -815,6 +814,7 @@ class Service extends \think\Service
             $addon_detail_data = $addon_detail['data'] ?? [];
             $readme = $addon_detail_data['readme'] ?? "";
             $readme = str_replace(["\n", "\r"], "", $readme);
+
             $info['title'] = $addon_detail_data['name'] ?? "";
             $info['intro'] = $addon_detail_data['description'] ?? "";
             $info['img'] = $addon_detail_data['img'] ?? "";
@@ -926,20 +926,34 @@ class Service extends \think\Service
             throw new Exception('文件没有写入权限');
         }
         $array = require $file;
-        $ins_middleware = "app\api\middleware\\" . ucwords($name) . "";
-        if (!file_exists(root_path("app\api\middleware") . ucwords($name) . ".php") and $force == true) {
-            $ins_middleware = "app\index\middleware\\" . ucwords($name) . "";
-            if (!file_exists(root_path("app\index\middleware") . ucwords($name) . ".php") and $force == true) {
-                return false;
+
+        if ($force == true) {
+            $path = root_path();
+        } else {
+            $path = addon_path() . ds() . strtolower($name) . ds();
+        }
+
+        $ins_middleware = [
+            "app\api\middleware\\" . ucwords($name),
+            "app\index\middleware\\" . ucwords($name),
+        ];
+        foreach ($ins_middleware as $k => $val) {
+            if (!file_exists($path . $val . ".php")) {
+                unset($ins_middleware[$k]);
             }
         }
+
         foreach ($array as $key => $item) {
-            if ($item == $ins_middleware) {
-                unset($array[$key]);
+            foreach ($ins_middleware as $k => $v) {
+                if ($item == $v) {
+                    unset($array[$key]);
+                }
             }
         }
         if ($force == true) {
-            $array[] = $ins_middleware;
+            foreach ($ins_middleware as $v) {
+                $array[] = $v;
+            }
         }
 
         if ($handle = fopen($file, 'w')) {
