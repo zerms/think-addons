@@ -372,7 +372,7 @@ if (!function_exists('get_addons_autoload_config')) {
 
         // 读取插件目录及钩子列表
         $base = get_class_methods('\\think\\Addons');
-        $base = array_merge($base, ['install', 'uninstall', 'enable', 'disable','config']);
+        $base = array_merge($base, ['install', 'uninstall', 'enable', 'disable', 'config', 'write_hook']);
 
         $addons = get_addons_list();
         foreach ($addons as $name => $addon) {

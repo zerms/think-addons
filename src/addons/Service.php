@@ -312,8 +312,6 @@ class Service extends \think\Service
         self::importsql($name);
         // 启用插件
         self::enable($name, true);
-        // 启用中间件
-        self::middleware($name, true);
 
         $info['config'] = get_addons_config($name) ? 1 : 0;
         $info['testdata'] = is_file(self::getTestdataFile($name));
@@ -369,6 +367,8 @@ class Service extends \think\Service
         File::del_dir(addon_path() . $name);
         // 刷新
         self::refresh();
+        // 卸载插件钩子方法
+        self::write_hook_function($name,true);
         // 禁用中间件
         self::middleware($name, false);
         return true;
@@ -491,6 +491,8 @@ class Service extends \think\Service
 
         // 刷新
         Service::refresh();
+        // 写入插件钩子方法
+        self::write_hook_function($name);
         // 启用中间件
         self::middleware($name, true);
         return true;
@@ -603,6 +605,8 @@ class Service extends \think\Service
 
         // 刷新
         Service::refresh();
+        // 卸载插件钩子方法
+        self::write_hook_function($name,true);
         // 禁用中间件
         self::middleware($name, false);
         return true;
@@ -876,6 +880,46 @@ class Service extends \think\Service
         return true;
     }
 
+    /**
+     * 将插件钩子内容写入对应插件钩子汇总文件中
+     *
+     * @param string $name 插件名称
+     * @param boolean $force 是否禁用
+     * @return  string
+     * @throws  Exception
+     */
+    public static function write_hook_function(string $name, $force = false)
+    {
+        $sign = "";
+        $class = get_addons_class($name);
+        $write_hook_text = "";
+        $write_hook_local = "index";
+        if (class_exists($class)) {
+            $addon = new $class(App::instance());
+            $write_hook = $addon->write_hook();
+            $write_hook_text = !empty($write_hook['text']) ? "#$name#\n" . trim($write_hook['text']) . "\n#$name#" : $write_hook_text;
+            $write_hook_local = $write_hook['local'] ?? $write_hook_local;
+        }
+        $hook_file = root_path("app" . ds() . "common" . ds() . "hook") . $write_hook_local . ".php";
+        $hook_text = @file_get_contents($hook_file);
+
+        $pattern = "#$name\#[\S\s]*?\#$name#";
+        if ($force == false) {
+            // 启用(插入或覆盖)
+            if (preg_match($pattern, $hook_text) == 0) {
+                // 不存在(插入)
+                $hook_text .= $write_hook_text;
+            } else {
+                // 存在(覆盖)
+                $hook_text = preg_replace("($pattern)", $write_hook_text, $hook_text);
+            }
+        } else {
+            // 禁用(替换为空)
+            $hook_text = preg_replace("($pattern)", "", $hook_text);
+        }
+        @file_put_contents($hook_file, $hook_text);
+        return true;
+    }
 
     /**
      * 导入SQL
