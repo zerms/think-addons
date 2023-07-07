@@ -23,6 +23,7 @@ use think\facade\Lang;
 use think\facade\Event;
 use think\addons\middleware\Addons;
 use xb\File;
+use xb\Rsa;
 
 /**
  * 插件服务
@@ -1242,7 +1243,7 @@ class Service extends \think\Service
         }
         try {
             $data = json_encode($data);
-            $openssl = new xb\Rsa([
+            $openssl = new Rsa([
                 'publicKey' => $extend['public_key']
             ]);
             //公钥加密
