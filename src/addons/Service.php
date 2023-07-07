@@ -1240,14 +1240,16 @@ class Service extends \think\Service
         if (empty($url) or empty($data) or empty($method)) {
             throw new Exception(__("Invalid parameters"));
         }
-        $data = json_encode($data);
-        // 数据通过公钥加密
-        $ras_encryption = openssl_public_encrypt($data, $encrypt, $extend['public_key']);
-        if ($ras_encryption == false) {
-            throw new Exception("加密数据获取失败");
+        try {
+            $data = json_encode($data);
+            $openssl = new xb\Rsa([
+                'publicKey' => $extend['public_key']
+            ]);
+            //公钥加密
+            $encrypt = $openssl->encrypt($data, 1);
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
         }
-        // 通过hex转换
-        $encrypt = bin2hex($encrypt);
         $url = $url . $encrypt;
         $res = curl_send($url, $method, "", $extend['sign']);
         if ($status == 1) {
