@@ -891,6 +891,10 @@ class Service extends \think\Service
      */
     public static function write_hook_function(string $name, $force = false)
     {
+        $addon = get_addons_instance($name);
+        if (!method_exists($addon, 'write_hook')) {
+            return false;
+        }
         $sign = "";
         $class = get_addons_class($name);
         $write_hook_text = "";
