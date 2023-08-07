@@ -901,9 +901,11 @@ class Service extends \think\Service
         $write_hook_local = "index";
         if (class_exists($class)) {
             $addon = new $class(App::instance());
-            $write_hook = $addon->write_hook();
-            $write_hook_text = !empty($write_hook['text']) ? "#$name#\n" . trim($write_hook['text']) . "\n#$name#" : $write_hook_text;
-            $write_hook_local = $write_hook['local'] ?? $write_hook_local;
+            if (method_exists($addon, 'write_hook')) {
+                $write_hook = $addon->write_hook();
+                $write_hook_text = !empty($write_hook['text']) ? "#$name#\n" . trim($write_hook['text']) . "\n#$name#" : $write_hook_text;
+                $write_hook_local = $write_hook['local'] ?? $write_hook_local;
+            }
         }
         $hook_file = root_path("app" . ds() . "common" . ds() . "hook") . $write_hook_local . ".php";
         $hook_text = @file_get_contents($hook_file);
