@@ -309,11 +309,15 @@ class Service extends \think\Service
             Db::rollback();
             throw new Exception($e->getMessage());
         }
-        // 导入
-        self::importsql($name);
-        // 启用插件
-        self::enable($name, true);
-
+        try {
+            // 导入
+            self::importsql($name);
+            // 启用插件
+            self::enable($name, true);
+        } catch (Exception $e) {
+            @rmdirs($addonDir);
+            throw new Exception($e->getMessage());
+        }
         $info['config'] = get_addons_config($name) ? 1 : 0;
         $info['testdata'] = is_file(self::getTestdataFile($name));
         return $info;
@@ -417,6 +421,19 @@ class Service extends \think\Service
         }
         if (!$force) {
             Service::noconflict($name);
+        }
+        // 是否检查相同类型插件
+        $info = get_addons_info($name);
+        if (isset($info['same_type_limit']) and $info['same_type_limit'] == 1) {
+            $addons_list = get_addons_list();
+            if(!empty($addons_list)) {
+                foreach ($addons_list as $item) {
+                    $type = $item['type'] ?? "";
+                    if(($info['type'] == $type and $item['status'] == 1) and $info['name'] != $item['name']) {
+                        throw new Exception(__("Same type addon exists"));
+                    }
+                }
+            }
         }
 
         // 备份冲突文件
@@ -901,11 +918,9 @@ class Service extends \think\Service
         $write_hook_local = "index";
         if (class_exists($class)) {
             $addon = new $class(App::instance());
-            if (method_exists($addon, 'write_hook')) {
-                $write_hook = $addon->write_hook();
-                $write_hook_text = !empty($write_hook['text']) ? "#$name#\n" . trim($write_hook['text']) . "\n#$name#" : $write_hook_text;
-                $write_hook_local = $write_hook['local'] ?? $write_hook_local;
-            }
+            $write_hook = $addon->write_hook();
+            $write_hook_text = !empty($write_hook['text']) ? "#$name#\n" . trim($write_hook['text']) . "\n#$name#" : $write_hook_text;
+            $write_hook_local = $write_hook['local'] ?? $write_hook_local;
         }
         $hook_file = root_path("app" . ds() . "common" . ds() . "hook") . $write_hook_local . ".php";
         $hook_text = @file_get_contents($hook_file);
