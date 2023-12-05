@@ -538,10 +538,7 @@ class Service extends \think\Service
         if (!$force) {
             Service::noconflict($name);
         }
-        // 提前移除引用中间件
-        if(!self::middleware($name, false)) {
-            throw new Exception("移除中间件失败");
-        }
+
         // 备份冲突文件
         if (config('cms.backup_global_files')) {
             // 仅备份修改过的文件
@@ -626,7 +623,10 @@ class Service extends \think\Service
         } catch (Exception $e) {
             throw new Exception($e->getMessage());
         }
-
+        // 移除引用中间件
+        if(!self::middleware($name, false)) {
+            throw new Exception("移除中间件失败");
+        }
         // 刷新
         Service::refresh();
         // 卸载插件钩子方法
@@ -994,7 +994,8 @@ class Service extends \think\Service
      */
     public static function middleware(string $name, bool $force = false)
     {
-        $file = root_path("app") . 'middleware.php';
+        // $file = root_path("app") . 'middleware.php';
+        $file = '../app/middleware.php';
         if (!File::is_really_writable($file)) {
             throw new Exception('文件没有写入权限');
         }
