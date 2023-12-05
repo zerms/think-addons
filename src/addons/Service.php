@@ -539,7 +539,9 @@ class Service extends \think\Service
             Service::noconflict($name);
         }
         // 提前移除引用中间件
-        self::middleware($name, false);
+        if(!self::middleware($name, false)) {
+            throw new Exception("移除中间件失败");
+        }
         // 备份冲突文件
         if (config('cms.backup_global_files')) {
             // 仅备份修改过的文件
