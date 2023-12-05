@@ -309,6 +309,7 @@ class Service extends \think\Service
             Db::rollback();
             throw new Exception($e->getMessage());
         }
+
         try {
             // 导入
             self::importsql($name);
@@ -373,7 +374,7 @@ class Service extends \think\Service
         // 刷新
         self::refresh();
         // 卸载插件钩子方法
-        self::write_hook_function($name,true);
+        self::write_hook_function($name, true);
         // 禁用中间件
         self::middleware($name, false);
         return true;
@@ -422,6 +423,7 @@ class Service extends \think\Service
         if (!$force) {
             Service::noconflict($name);
         }
+        $addonDir = self::getAddonDir($name);
         // 是否检查相同类型插件
         $info = get_addons_info($name);
         if (isset($info['same_type_limit']) and $info['same_type_limit'] == 1) {
@@ -555,6 +557,8 @@ class Service extends \think\Service
                 }
             }
         }
+        // 提前移除引用中间件
+        self::middleware($name, false);
         // 读取插件配置
         $config = Service::config($name);
         // 指定插件目录
@@ -624,7 +628,7 @@ class Service extends \think\Service
         // 刷新
         Service::refresh();
         // 卸载插件钩子方法
-        self::write_hook_function($name,true);
+        self::write_hook_function($name, true);
         // 禁用中间件
         self::middleware($name, false);
         return true;
@@ -918,9 +922,11 @@ class Service extends \think\Service
         $write_hook_local = "index";
         if (class_exists($class)) {
             $addon = new $class(App::instance());
-            $write_hook = $addon->write_hook();
-            $write_hook_text = !empty($write_hook['text']) ? "#$name#\n" . trim($write_hook['text']) . "\n#$name#" : $write_hook_text;
-            $write_hook_local = $write_hook['local'] ?? $write_hook_local;
+            if (method_exists($addon, 'write_hook')) {
+                $write_hook = $addon->write_hook();
+                $write_hook_text = !empty($write_hook['text']) ? "#$name#\n" . trim($write_hook['text']) . "\n#$name#" : $write_hook_text;
+                $write_hook_local = $write_hook['local'] ?? $write_hook_local;
+            }
         }
         $hook_file = root_path("app" . ds() . "common" . ds() . "hook") . $write_hook_local . ".php";
         $hook_text = @file_get_contents($hook_file);
@@ -994,21 +1000,23 @@ class Service extends \think\Service
         $array = require $file;
 
         if ($force == true) {
-            $path = root_path();
+            // $path = root_path();
+            $path = "../";
         } else {
-            $path = addon_path() . ds() . strtolower($name) . ds();
+            // $path = addon_path() . ds() . strtolower($name) . ds();
+            $path = "../addons" . ds() . strtolower($name) . ds();
         }
 
         $ins_middleware = [
-            "app\api\middleware\\" . ucwords($name),
-            "app\index\middleware\\" . ucwords($name),
+            "app" . ds() . "api" . ds() . "middleware" . ds() . "" . ucwords($name),
+            "app" . ds() . "index" . ds() . "middleware" . ds() . "" . ucwords($name),
         ];
         foreach ($ins_middleware as $k => $val) {
-            if (!file_exists($path . $val . ".php")) {
+            $val_path = $path . $val . ".php";
+            if (!file_exists($val_path)) {
                 unset($ins_middleware[$k]);
             }
         }
-
         foreach ($array as $key => $item) {
             foreach ($ins_middleware as $k => $v) {
                 if ($item == $v) {
@@ -1018,10 +1026,9 @@ class Service extends \think\Service
         }
         if ($force == true) {
             foreach ($ins_middleware as $v) {
-                $array[] = $v;
+                $array[] = str_replace("/", "\\", $v);
             }
         }
-
         if ($handle = fopen($file, 'w')) {
             fwrite($handle, "<?php\n\n" . 'return ' . var_export($array, true) . ";\n");
             fclose($handle);
