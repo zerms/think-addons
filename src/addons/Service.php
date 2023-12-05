@@ -561,7 +561,6 @@ class Service extends \think\Service
                 }
             }
         }
-
         // 读取插件配置
         $config = Service::config($name);
         // 指定插件目录
@@ -632,8 +631,7 @@ class Service extends \think\Service
         Service::refresh();
         // 卸载插件钩子方法
         self::write_hook_function($name, true);
-        // 禁用中间件
-        self::middleware($name, false);
+
         return true;
     }
 
