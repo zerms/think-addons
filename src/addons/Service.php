@@ -542,6 +542,7 @@ class Service extends \think\Service
         if (!self::middleware($name, false)) {
             throw new Exception("移除中间件失败");
         }
+        Cache::clear();
         // 备份冲突文件
         if (config('cms.backup_global_files')) {
             // 仅备份修改过的文件
