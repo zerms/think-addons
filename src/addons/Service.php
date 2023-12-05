@@ -538,6 +538,8 @@ class Service extends \think\Service
         if (!$force) {
             Service::noconflict($name);
         }
+        // 提前移除引用中间件
+        self::middleware($name, false);
         // 备份冲突文件
         if (config('cms.backup_global_files')) {
             // 仅备份修改过的文件
@@ -557,8 +559,7 @@ class Service extends \think\Service
                 }
             }
         }
-        // 提前移除引用中间件
-        self::middleware($name, false);
+
         // 读取插件配置
         $config = Service::config($name);
         // 指定插件目录
