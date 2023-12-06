@@ -259,19 +259,6 @@ class Service extends \think\Service
         if (!$name || (is_dir(addon_path() . $name) && !$force)) {
             throw new Exception(__("Addon already exists"));
         }
-        // 是否检查相同类型插件
-        $info = get_addons_info($name);
-        if (isset($info['same_type_limit']) and $info['same_type_limit'] == 1) {
-            $addons_list = get_addons_list();
-            if (!empty($addons_list)) {
-                foreach ($addons_list as $item) {
-                    $type = $item['type'] ?? "";
-                    if (($info['type'] == $type and $item['status'] == 1) and $info['name'] != $item['name']) {
-                        throw new Exception(__("Same type addon exists"));
-                    }
-                }
-            }
-        }
         $extend['domain'] = request()->host(true);
         // 远程下载插件
         $tmpFile = Service::download($name, $extend);
@@ -296,6 +283,21 @@ class Service extends \think\Service
         }
         // 默认启用该插件
         $info = get_addons_info($name);
+        // 是否检查相同类型插件
+        if (isset($info['same_type_limit']) and $info['same_type_limit'] == 1) {
+            $addons_list = get_addons_list();
+            if (!empty($addons_list)) {
+                foreach ($addons_list as $item) {
+                    $type = $item['type'] ?? "";
+                    if (($info['type'] == $type and $item['status'] == 1) and $info['name'] != $item['name']) {
+                        @rmdirs($addonDir);
+                        // 移除临时文件
+                        @unlink($tmpFile);
+                        throw new Exception(__("Same type addon exists"));
+                    }
+                }
+            }
+        }
         Db::startTrans();
         try {
             if (!$info['status']) {
