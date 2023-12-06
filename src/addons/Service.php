@@ -259,11 +259,23 @@ class Service extends \think\Service
         if (!$name || (is_dir(addon_path() . $name) && !$force)) {
             throw new Exception(__("Addon already exists"));
         }
+        // 是否检查相同类型插件
+        $info = get_addons_info($name);
+        if (isset($info['same_type_limit']) and $info['same_type_limit'] == 1) {
+            $addons_list = get_addons_list();
+            if (!empty($addons_list)) {
+                foreach ($addons_list as $item) {
+                    $type = $item['type'] ?? "";
+                    if (($info['type'] == $type and $item['status'] == 1) and $info['name'] != $item['name']) {
+                        throw new Exception(__("Same type addon exists"));
+                    }
+                }
+            }
+        }
         $extend['domain'] = request()->host(true);
         // 远程下载插件
         $tmpFile = Service::download($name, $extend);
         $addonDir = self::getAddonDir($name);
-
         try {
             // 解压插件压缩包到插件目录
             Service::unzip($name);
@@ -282,10 +294,8 @@ class Service extends \think\Service
             // 移除临时文件
             @unlink($tmpFile);
         }
-
         // 默认启用该插件
         $info = get_addons_info($name);
-
         Db::startTrans();
         try {
             if (!$info['status']) {
@@ -309,7 +319,6 @@ class Service extends \think\Service
             Db::rollback();
             throw new Exception($e->getMessage());
         }
-
         try {
             // 导入
             self::importsql($name);
@@ -424,19 +433,6 @@ class Service extends \think\Service
             Service::noconflict($name);
         }
         $addonDir = self::getAddonDir($name);
-        // 是否检查相同类型插件
-        $info = get_addons_info($name);
-        if (isset($info['same_type_limit']) and $info['same_type_limit'] == 1) {
-            $addons_list = get_addons_list();
-            if (!empty($addons_list)) {
-                foreach ($addons_list as $item) {
-                    $type = $item['type'] ?? "";
-                    if (($info['type'] == $type and $item['status'] == 1) and $info['name'] != $item['name']) {
-                        throw new Exception(__("Same type addon exists"));
-                    }
-                }
-            }
-        }
 
         // 备份冲突文件
         if (config('cms.backup_global_files')) {
