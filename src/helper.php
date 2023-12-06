@@ -372,7 +372,7 @@ if (!function_exists('get_addons_autoload_config')) {
 
         // 读取插件目录及钩子列表
         $base = get_class_methods('\\think\\Addons');
-        $base = array_merge($base, ['install', 'uninstall', 'enable', 'disable', 'config', 'write_hook']);
+        $base = array_merge($base, ['install', 'uninstall', 'enable', 'disable', 'config', 'write_hook', "check"]);
 
         $addons = get_addons_list();
         foreach ($addons as $name => $addon) {
@@ -487,7 +487,6 @@ if (!function_exists('config_tree')) {
     }
 }
 
-
 if (!function_exists('set_addons_fullconfig')) {
     /**
      * 写入配置文件.
@@ -510,6 +509,32 @@ if (!function_exists('set_addons_fullconfig')) {
         }
 
         return true;
+    }
+}
+
+if (!function_exists('get_same_type_addon')) {
+    /**
+     * 获取相同类型插件.
+     * @param string $type 插件类型
+     * @return string
+     * @throws Exception
+     */
+    function get_same_type_addon($type)
+    {
+        if (empty($type)) {
+            return "";
+        }
+        $name = "";
+        $addons_list = get_addons_list();
+        foreach ($addons_list as $item) {
+            if (isset($item['type']) and $item['type'] == $type) {
+                if ($item['status']) {
+                    $name = $item['name'];
+                    break;
+                }
+            }
+        }
+        return $name;
     }
 }
 
