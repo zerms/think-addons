@@ -542,7 +542,6 @@ class Service extends \think\Service
         if (!self::middleware($name, false)) {
             throw new Exception("移除中间件失败");
         }
-        Cache::clear();
         // 备份冲突文件
         if (config('cms.backup_global_files')) {
             // 仅备份修改过的文件
@@ -603,7 +602,6 @@ class Service extends \think\Service
             $dirs[] = dirname($file);
             @unlink($file);
         }
-
         // 移除插件空目录
         $dirs = array_filter(array_unique($dirs));
         foreach ($dirs as $k => $v) {
@@ -627,12 +625,10 @@ class Service extends \think\Service
         } catch (Exception $e) {
             throw new Exception($e->getMessage());
         }
-
         // 刷新
         Service::refresh();
         // 卸载插件钩子方法
         self::write_hook_function($name, true);
-
         return true;
     }
 
@@ -990,51 +986,56 @@ class Service extends \think\Service
      * 写入中间件
      *
      * @param string $name 插件名称
-     * @param boolean $force 是否禁用
+     * @param boolean $force 是否禁用 true启用,false禁用
      * @return  boolean
      */
     public static function middleware(string $name, bool $force = false)
     {
-        $file = '../app/middleware.php';
-        if (!File::is_really_writable($file)) {
-            throw new Exception('文件没有写入权限');
-        }
-        $array = require $file;
         $path = "../";
-        $addons_list = get_addons_list();
-        $addons_middleware_data = [];
-        foreach ($array as $key => $item) {
-            if (strpos($item, "app\\") !== false) {
-                continue;
-            } else {
-                $addons_middleware_data[] = $item;
+        // 判断插件在某个应用
+        $ins_middleware = [
+            "app" . ds() . "api" . ds() . "middleware" . ds() . "" . ucwords($name),
+            "app" . ds() . "index" . ds() . "middleware" . ds() . "" . ucwords($name),
+        ];
+        $file = "";
+        $middleware_data = [];
+        foreach ($ins_middleware as $k1 => $v1) {
+            if (file_exists($path . $v1 . ".php")) {
+                $middleware_file = str_replace([ds() . "" . ucwords($name), ds()], [".php", "/"], $v1);
+                $middleware_data[] = [
+                    "middleware_file" => $middleware_file,// 应用中间件
+                    "current_middleware_file" => $v1 . ".php",// 当前中间件路径
+                    "current_middleware" => $v1,// 当前中间件
+                ];
             }
         }
-        foreach ($addons_list as $key => $item) {
-            $addons_find_name = $item['name'];
-            if ($addons_find_name == $name and $force == false) {
-                // 当前插件禁用
+        foreach ($middleware_data as $k2 => $v2) {
+            $middleware_file_path = $path . $v2['middleware_file'];
+            if (!File::is_really_writable($middleware_file_path)) {
+                // 文件无权限写入,跳过
                 continue;
             }
-            $ins_middleware = [
-                "app" . ds() . "api" . ds() . "middleware" . ds() . "" . ucwords($addons_find_name),
-                "app" . ds() . "index" . ds() . "middleware" . ds() . "" . ucwords($addons_find_name),
-            ];
-            foreach ($ins_middleware as $k => $val) {
-                if ($item['status'] == 1) {
-                    $val_path = $path . $val . ".php";
-                    if (file_exists($val_path)) {
-                        $addons_middleware_data[] = str_replace("/", "\\", $val);
-                    }
+            $middleware_array = [];
+            $middleware_array = require $middleware_file_path;
+            foreach ($middleware_array as $k3 => $v3) {
+                // 找到相同中间件,删除
+                if ($v2['current_middleware'] == $v3) {
+                    unset($middleware_array[$k3]);
                 }
             }
-        }
-        $addons_middleware_data = array_unique($addons_middleware_data);
-        if ($handle = fopen($file, 'w')) {
-            fwrite($handle, "<?php\n\n" . 'return ' . var_export($addons_middleware_data, true) . ";\n");
-            fclose($handle);
-        } else {
-            throw new Exception('文件没有写入权限');
+            if ($force == true) {
+                // 启用时,不管存在与否,都被删除,重新添加
+                $middleware_array[] = str_replace(ds(), "\\", $v2['current_middleware']);
+            }
+            // 数组去重
+            $middleware_array = array_unique($middleware_array);
+            if ($handle = fopen($path . $v2['middleware_file'], 'w')) {
+                fwrite($handle, "<?php\n\n" . 'return ' . var_export($middleware_array, true) . ";\n");
+                fclose($handle);
+            } else {
+                // 文件没有写入权限
+                throw new Exception('文件没有写入权限');
+            }
         }
         return true;
     }
