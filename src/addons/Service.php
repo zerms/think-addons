@@ -250,7 +250,7 @@ class Service extends \think\Service
      * @param string $name 插件名称
      * @param boolean $force 是否覆盖
      * @param array $extend 扩展参数
-     * @return  boolean
+     * @return  boolean|string|array
      * @throws  Exception
      * @throws  AddonException
      */
@@ -1017,7 +1017,8 @@ class Service extends \think\Service
             $middleware_array = require $middleware_file_path;
             foreach ($middleware_array as $k3 => $v3) {
                 // 找到相同中间件,删除
-                if ($v2['current_middleware'] == $v3) {
+                $v2_current_middleware = str_replace(ds(), "\\", $v2['current_middleware']);
+                if ($v2_current_middleware == $v3) {
                     unset($middleware_array[$k3]);
                 }
             }
