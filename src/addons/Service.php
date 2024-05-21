@@ -666,7 +666,6 @@ class Service extends \think\Service
             // 移除临时文件
             @unlink($tmpFile);
         }
-
         if ($config) {
             // 还原配置
             set_addons_config($name, $config);
@@ -674,7 +673,6 @@ class Service extends \think\Service
 
         // 导入
         Service::importsql($name, "update.sql");
-
         // 执行升级脚本
         try {
             $addonName = ucfirst($name);
@@ -791,25 +789,34 @@ class Service extends \think\Service
         }
         $addonsBackupDir = self::getAddonsBackupDir();
         $file = $addonsBackupDir . $name . '.zip';
-
         // 打开插件压缩包
-        $zip = new ZipFile();
+        $zip = new \ZipArchive();
         try {
-            $zip->openFile($file);
+            $res = $zip->open($file);
         } catch (ZipException $e) {
             $zip->close();
             throw new Exception(__("Unable to open the zip file"));
         }
-
-        $dir = self::getAddonDir($name);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755);
-        }
-
         // 解压插件压缩包
         try {
-            $zip->extractTo($dir);
-        } catch (ZipException $e) {
+            if ($res === TRUE) {
+                $dir = self::getAddonDir($name);
+                if (!is_dir($dir)) {
+                    @mkdir($dir, 0777);
+                }
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $stat = $zip->statIndex($i);
+                    $path = $dir . $stat['name'];
+                    // 如果文件已存在，则覆盖它
+                    if (file_exists($path) and is_file($path)) {
+                        @unlink($path);
+                    }
+                    // 解压文件
+                    $zip->extractTo($dir, $stat['name']);
+                }
+            }
+//            $zip->extractTo($dir);
+        } catch (Exception|ZipException $e) {
             throw new Exception(__("Unable to extract the file"));
         } finally {
             $zip->close();
@@ -1222,7 +1229,7 @@ class Service extends \think\Service
     {
         $dir = runtime_path() . 'addons' . ds();
         if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
+            @mkdir($dir, 0777, true);
         }
         return $dir;
     }
